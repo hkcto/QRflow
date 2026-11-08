@@ -1,0 +1,250 @@
+# QRflow — Dynamic QR Code SaaS (Weekend MVP)
+
+一次建立、永久可改的動態 QR Code。QR 圖片永遠編碼 `https://<APP_URL>/r/<code>`，之後只改資料庫裡的 `target_url`，已印出的 QR 不需要更換。
+
+- 前端 / 後端：Next.js 15 App Router、TypeScript、TailwindCSS v4、Server Actions
+- 資料庫 / 認證：Supabase Postgres + Google OAuth（僅 Google 登入）
+- QR 產生：`qrcode`（僅 PNG）
+- 部署：Vercel
+
+---
+
+## 功能
+
+| 功能 | 狀態 |
+|---|---|
+| Google 登入 / 登出 | ✅ |
+| 受保護的 `/dashboard` | ✅ |
+| 建立 QR（名稱 + 目標網址 + 隨機 7 位短碼） | ✅ |
+| 列表：名稱、目標網址、掃描數 | ✅ |
+| 編輯名稱 / 目標網址（短碼與圖片不變） | ✅ |
+| 刪除（含二次確認） | ✅ |
+| QR 檢視、複製短鏈、下載 PNG | ✅ |
+| 匿名掃描計數（原子遞增） | ✅ |
+| 深色模式、響應式 | ✅ |
+| 功能旗標 `ENABLE_PRO` + `/pricing` | ✅ |
+| Stripe / 角色 / 郵件登入 / SVG | ❌ 刻意不做 |
+
+---
+
+## 目錄結構
+
+```
+QRCode_saas/
+├─ .env.example
+├─ .env.local               # 本機用，已 gitignore
+├─ middleware.ts            # 只刷新 Supabase session
+├─ supabase/schema.sql      # 建表 + RLS + RPC（執行一次）
+├─ types/database.ts        # 最小型別定義
+├─ lib/
+│  ├─ auth.ts               # getUser / requireUser
+│  ├─ features.ts           # ENABLE_PRO
+│  ├─ qr.ts                 # 短碼、短鏈、PNG 產生
+│  ├─ validation.ts         # 表單驗證（無 zod）
+│  ├─ types.ts
+│  └─ supabase/             # client / server / middleware
+├─ components/
+│  ├─ qr-form.tsx           # useActionState 表單
+│  ├─ qr-card.tsx
+│  ├─ copy-button.tsx
+│  ├─ delete-form.tsx
+│  └─ theme-toggle.tsx
+└─ app/
+   ├─ page.tsx              # 落地頁 + Google 登入
+   ├─ pricing/page.tsx
+   ├─ auth/callback/route.ts
+   ├─ r/[code]/route.ts     # 計數 + 307 跳轉
+   ├─ api/qr/[code]/route.ts# PNG（?download=1）
+   └─ dashboard/            # 列表、建立、詳情、編輯、actions
+```
+
+---
+
+## 1. 安裝與啟動
+
+需求：Node.js 22 LTS 以上、npm。
+
+```bash
+npm install
+cp .env.example .env.local   # Windows: copy .env.example .env.local
+```
+
+先完成下面 2、3 節取得 Supabase 與 Google 的金鑰，填入 `.env.local`：
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+ENABLE_PRO=false
+```
+
+啟動：
+
+```bash
+npm run dev      # http://localhost:3000
+npm run build    # 生產建置
+npm run lint
+```
+
+---
+
+## 2. Supabase 設定
+
+1. 建立專案：<https://supabase.com/dashboard> → **New project**（區域選離使用者最近的）。
+2. 開啟 **SQL Editor → New query**，貼上 `supabase/schema.sql` 全文並執行。
+   - 這會建立 `qrcodes` 表、索引、4 條 RLS 策略，以及兩個 `SECURITY DEFINER` 函式：
+     - `increment_scan(code)`：匿名掃描時原子遞增並回傳目標網址
+     - `get_qr_public(code)`：讓 PNG 端點驗證短碼存在（只回傳名稱）
+3. 取得金鑰：**Project Settings → API**
+   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+   - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **不要**使用 `service_role` key，本專案不需要。
+
+> 安全設計：`qrcodes` 沒有對 `anon` 開放任何 SELECT 策略，因此匿名者無法透過 PostgREST 列出所有目標網址；唯一的匿名入口是上面兩個受限函式。
+
+### 未來要「暫停」某個 QR
+
+`is_active = false` 後，`/r/<code>` 會回 404：
+
+```sql
+update public.qrcodes set is_active = false where code = 'abc1234';
+```
+
+---
+
+## 3. Google OAuth 設定
+
+### 3.1 Google Cloud Console
+
+1. <https://console.cloud.google.com/> → 建立或選擇專案。
+2. **APIs & Services → OAuth consent screen**：選 External，填 App name、support email、developer email，儲存。
+3. **Credentials → Create credentials → OAuth client ID**
+   - Application type：**Web application**
+   - Authorized redirect URI：
+     ```
+     https://<PROJECT-REF>.supabase.co/auth/v1/callback
+     ```
+     （`<PROJECT-REF>` 是 Supabase 專案網址的前段，例如 `abcdefghijkl`）
+4. 記下 **Client ID** 與 **Client secret**。
+
+### 3.2 Supabase
+
+1. **Authentication → Providers → Google**：Enable，貼上 Client ID / Secret，Save。
+2. **Authentication → URL Configuration**
+   - **Site URL**：`http://localhost:3000`（上線後改成 `https://your-domain.com`）
+   - **Redirect URLs** 加入：
+     ```
+     http://localhost:3000/auth/callback
+     https://your-domain.com/auth/callback
+     ```
+
+流程：`/` 按「Continue with Google」→ Supabase OAuth → `/auth/callback` 交換 session → `/dashboard`。
+
+---
+
+## 4. 部署到 Vercel
+
+1. 把專案推到 GitHub：
+
+   ```bash
+   git init
+   git add .
+   git commit -m "Weekend MVP: dynamic QR code SaaS"
+   git remote add origin <your-repo-url>
+   git push -u origin main
+   ```
+
+2. Vercel → **Add New Project** → 匯入 repo（Framework 會自動偵測 Next.js）。
+3. **Environment Variables** 加入：
+
+   | Key | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` |
+   | `NEXT_PUBLIC_APP_URL` | `https://your-domain.com` |
+   | `ENABLE_PRO` | `false` |
+
+4. Deploy。
+5. 回到 Supabase **URL Configuration**，把 Site URL 與 Redirect URLs 換成正式網域。
+6. 用手機掃一張剛建立的 QR，確認能跳轉且計數增加。
+
+> `NEXT_PUBLIC_APP_URL` 決定 QR 圖片裡編碼的網址。**一旦印出就不要改網域**，否則舊碼會指向舊網域。
+
+---
+
+## 5. 驗收清單
+
+- [ ] Google 登入成功、登出可用
+- [ ] 未登入訪問 `/dashboard` 會回首頁
+- [ ] 建立 QR 後出現在列表，縮圖正常
+- [ ] 下載 PNG，手機掃描可跳轉
+- [ ] 修改目標網址後，同一張圖跳到新網址，`/r/<code>` 不變
+- [ ] 每次掃描 `scan_count + 1`
+- [ ] 複製短鏈可用
+- [ ] 刪除後 `/r/<code>` 回 404
+- [ ] 第二個帳號看不到別人的 QR（RLS）
+- [ ] 手機寬度正常、深色模式可切換且重整後保持
+- [ ] `npm run build` 成功
+
+---
+
+## 6. 運營後台（Supabase Studio）
+
+MVP 不建 Admin UI，直接用 Supabase Studio：
+
+```sql
+-- 全站概況
+select
+  (select count(*) from auth.users) as total_users,
+  (select count(*) from public.qrcodes) as total_qrcodes,
+  (select coalesce(sum(scan_count), 0) from public.qrcodes) as total_scans;
+
+-- 每位使用者的用量
+select u.email,
+       count(q.id) as qr_count,
+       coalesce(sum(q.scan_count), 0) as total_scans
+from auth.users u
+left join public.qrcodes q on q.user_id = u.id
+group by u.email
+order by total_scans desc;
+
+-- 下架違規碼
+delete from public.qrcodes where code = 'abc1234';
+```
+
+> 不要建立 `public` schema 的統計 view：Supabase 會透過 PostgREST 暴露它，而 view 預設不套用 RLS。若要建，請加 `with (security_invoker = true)` 或放在未暴露的 schema。
+
+---
+
+## 7. 已知限制（MVP 刻意取捨）
+
+- **計數沒有防刷**：任何請求（含機器人）都會 +1。可在 `/r/[code]` 過濾常見 bot UA，或加邊緣限流。
+- **公開跳轉端點**：可能被用來指向惡意網站。上線後請定期用上面的 SQL 巡查，必要時 `is_active = false` 或刪除。
+- **PNG 端點公開**：知道短碼的人就能取得圖片，這是分享功能的前提。
+- **無分頁**：列表一次載入全部。使用者量大時再加 `.range()`。
+- **無掃描明細**：只有總數。要按天/裝置統計需另建 `scans` 表。
+- **代理/預覽網域**：若沒設 `NEXT_PUBLIC_APP_URL`，會退回 `VERCEL_URL`，QR 內容會指向該網域。
+
+---
+
+## 8. 未來 Stripe 接法（本版未實作）
+
+結構已預留：
+
+1. `lib/features.ts` 的 `features.pro` 作為 UI 開關。
+2. `/pricing` 已有 Free / Pro 兩張卡與 disabled CTA。
+3. 接入時新增：
+   - `subscriptions` 表（`user_id`, `stripe_customer_id`, `status`, `price_id`, `current_period_end`）
+   - `/api/stripe/webhook/route.ts`（驗簽後 upsert 訂閱）
+   - Checkout Server Action
+   - `features.pro` 改為「讀取該使用者的訂閱狀態」，而不是環境變數
+
+---
+
+## 9. 技術備註
+
+- Next.js 15：`cookies()`、`params`、`searchParams` 皆為 Promise。
+- `/r/[code]` 與 `/api/qr/[code]` 都設 `dynamic = "force-dynamic"`，避免被 Vercel 快取導致計數不準。
+- 短碼：7 位 `[a-z0-9]`，建立時遇唯一鍵衝突（`23505`）自動重試 5 次。
+- 目標網址只允許 `http:` / `https:`，避免 `javascript:` 注入。
+- QR 內編碼的是 `/r/<code>`，與 `target_url` 完全解耦。

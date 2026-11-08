@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: var(--color-indigo-200);
+    color: var(--color-indigo-950);
+  }
+
+  .dark ::selection {
+    background-color: var(--color-indigo-800);
+    color: var(--color-indigo-50);
+  }
+}
