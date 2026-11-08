@@ -52,6 +52,8 @@ QRCode_saas/
 └─ app/
    ├─ page.tsx              # 落地頁 + Google 登入
    ├─ pricing/page.tsx
+   ├─ privacy/page.tsx      # 隱私政策（Google OAuth 發佈需要）
+   ├─ terms/page.tsx         # 服務條款（Google OAuth 發佈需要）
    ├─ auth/callback/route.ts
    ├─ r/[code]/route.ts     # 計數 + 307 跳轉
    ├─ api/qr/[code]/route.ts# PNG（?download=1）

@@ -240,6 +240,12 @@ export default async function HomePage({
             <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
               Pricing
             </Link>
+            <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">
+              Terms
+            </Link>
             <span>Weekend MVP</span>
           </div>
         </div>

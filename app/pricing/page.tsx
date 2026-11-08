@@ -136,6 +136,23 @@ export default async function PricingPage() {
           flag, ready for a Stripe integration later.
         </p>
       </main>
+
+      <footer className="border-t border-slate-200 py-8 dark:border-slate-800">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 text-sm text-slate-500 sm:flex-row sm:px-6 dark:text-slate-400">
+          <span>QRflow — dynamic QR codes for small teams.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-slate-900 dark:hover:text-white">
+              Home
+            </Link>
+            <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">
+              Terms
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
