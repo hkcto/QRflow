@@ -18,8 +18,8 @@ type QrCodeProps = {
  * Thin client-side wrapper around `qr-code-styling`.
  *
  * The library is browser-only (Canvas/SVG), so it is loaded inside an effect
- * and never evaluated during server rendering. The same instance is reused and
- * `.update()` is called when the payload or style changes.
+ * and never evaluated during server rendering. A fresh instance is rendered
+ * once per animation frame so bursts of style changes cannot overlap.
  */
 export function QrCode({
   data,
@@ -61,15 +61,18 @@ export function QrCode({
     const container = containerRef.current;
     if (!container) return;
 
-    if (!instanceRef.current) {
+    // Coalesce bursts (slider drags, rapid typing) into a single render per
+    // frame and build a fresh instance each time. Mutating an existing
+    // instance with `.update()` raced with its in-flight draw and could throw
+    // inside `isDark` when several style changes landed in the same tick.
+    const frame = requestAnimationFrame(() => {
       const instance = new renderer(options);
       instanceRef.current = instance;
       container.replaceChildren();
       instance.append(container);
-      return;
-    }
+    });
 
-    instanceRef.current.update(options);
+    return () => cancelAnimationFrame(frame);
   }, [renderer, options]);
 
   useEffect(() => {
