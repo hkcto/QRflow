@@ -58,6 +58,11 @@ export default function PrivacyPage() {
             location of people who scan your QR codes.
           </li>
           <li>
+            No content from the free static QR generator. It runs entirely in
+            your browser: links, text, Wi-Fi passwords and contact details you
+            enter there are never sent to us or stored anywhere.
+          </li>
+          <li>
             Your theme preference is kept in your browser&apos;s local storage and
             is never sent to our servers.
           </li>
@@ -66,10 +71,16 @@ export default function PrivacyPage() {
 
       <LegalSection heading="3. How QR scans work">
         <p>
-          When someone scans a QR code, our redirect endpoint looks up the short
-          code, increments a counter for that code, and forwards the visitor to the
-          destination URL. We store only the aggregate number of scans. We do not
-          build profiles of the people who scan.
+          When someone scans a dynamic QR code, our redirect endpoint looks up the
+          short code, increments a counter for that code, and forwards the visitor
+          to the destination URL. We store only the aggregate number of scans. We
+          do not build profiles of the people who scan.
+        </p>
+        <p>
+          Static QR codes created with our free generator are different: the image
+          is generated locally in your browser and encodes your content directly.
+          No request reaches our servers, so there is nothing for us to count or
+          store.
         </p>
       </LegalSection>
 

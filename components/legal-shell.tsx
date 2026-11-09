@@ -39,6 +39,12 @@ export function LegalShell({
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
+              href="/static-qr"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            >
+              Static QR
+            </Link>
+            <Link
               href="/pricing"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
             >
@@ -68,6 +74,12 @@ export function LegalShell({
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-slate-900 dark:hover:text-white">
               Home
+            </Link>
+            <Link
+              href="/static-qr"
+              className="hover:text-slate-900 dark:hover:text-white"
+            >
+              Static QR
             </Link>
             <Link
               href="/pricing"

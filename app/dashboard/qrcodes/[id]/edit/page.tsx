@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { updateQr } from "@/app/dashboard/actions";
 import { QrForm } from "@/components/qr-form";
 import { requireUser } from "@/lib/auth";
+import { parseQrStyle } from "@/lib/qr-style";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -45,7 +46,7 @@ export default async function EditQrPage({
         <span className="font-mono text-slate-800 dark:text-slate-200">
           /r/{qr.code}
         </span>{" "}
-        and the QR image stay exactly the same. Only the destination changes.
+        stays exactly the same. Only the destination and appearance change.
       </p>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -54,6 +55,7 @@ export default async function EditQrPage({
           submitLabel="Save changes"
           initialName={qr.name}
           initialTargetUrl={qr.target_url}
+          initialStyle={parseQrStyle(qr.style)}
           qrId={qr.id}
           cancelHref={`/dashboard/qrcodes/${qr.id}`}
         />

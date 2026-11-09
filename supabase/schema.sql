@@ -13,6 +13,12 @@ create table if not exists public.qrcodes (
   created_at  timestamptz not null default now()
 );
 
+-- Styled appearance (dot shape, colours, background). Validated by the app
+-- against a strict allow-list before it is written. Existing rows get `{}`,
+-- which the app normalizes to the classic style.
+alter table public.qrcodes
+  add column if not exists style jsonb not null default '{}'::jsonb;
+
 create index if not exists qrcodes_user_created_idx
   on public.qrcodes (user_id, created_at desc);
 
@@ -62,8 +68,8 @@ begin
 end;
 $$;
 
--- Public lookup used by the PNG endpoint to validate the code and pick a
--- download filename. Returns only the name, never the destination.
+-- Public lookup kept for backwards compatibility. The client-side renderer no
+-- longer needs it, but it is harmless and non-destructive to keep.
 create or replace function public.get_qr_public(p_code text)
 returns text
 language sql

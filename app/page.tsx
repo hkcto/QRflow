@@ -59,6 +59,12 @@ export default async function HomePage({
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
+              href="/static-qr"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            >
+              Static QR
+            </Link>
+            <Link
               href="/pricing"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
             >
@@ -123,6 +129,17 @@ export default async function HomePage({
                 Free to start. No credit card.
               </span>
             </div>
+
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              Just need a one-off code?{" "}
+              <Link
+                href="/static-qr"
+                className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Try the free static QR generator
+              </Link>{" "}
+              — no sign-in required.
+            </p>
 
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-slate-200 pt-6 text-sm dark:border-slate-800">
               <div>
@@ -213,7 +230,7 @@ export default async function HomePage({
           <ol className="mt-8 grid gap-6 sm:grid-cols-3">
             {[
               { step: "1", title: "Create", body: "Name it, paste the destination, and generate a short link." },
-              { step: "2", title: "Download", body: "Get a high-resolution PNG for stickers, menus and signs." },
+              { step: "2", title: "Download", body: "Get a print-ready PNG or a scalable SVG in the style you chose." },
               { step: "3", title: "Update", body: "Change the destination later. The printed code keeps working." },
             ].map((item) => (
               <li
@@ -237,6 +254,9 @@ export default async function HomePage({
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 text-sm text-slate-500 sm:flex-row sm:px-6 dark:text-slate-400">
           <span>QRflow — dynamic QR codes for small teams.</span>
           <div className="flex items-center gap-4">
+            <Link href="/static-qr" className="hover:text-slate-900 dark:hover:text-white">
+              Static QR
+            </Link>
             <Link href="/pricing" className="hover:text-slate-900 dark:hover:text-white">
               Pricing
             </Link>
@@ -246,7 +266,6 @@ export default async function HomePage({
             <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">
               Terms
             </Link>
-            <span>Weekend MVP</span>
           </div>
         </div>
       </footer>

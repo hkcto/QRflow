@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { DeleteForm } from "@/components/delete-form";
+import { QrCode } from "@/components/qr-code";
 import { deleteQr } from "@/app/dashboard/actions";
 import { getRedirectUrl } from "@/lib/qr";
+import { parseQrStyle } from "@/lib/qr-style";
 import type { QrCodeRow } from "@/types/database";
 
 export function QrCard({ qr }: { qr: QrCodeRow }) {
@@ -13,13 +15,12 @@ export function QrCard({ qr }: { qr: QrCodeRow }) {
           href={`/dashboard/qrcodes/${qr.id}`}
           className="shrink-0 rounded-xl bg-white p-1 ring-1 ring-slate-200 dark:ring-slate-700"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/qr/${qr.code}`}
-            alt={`QR code for ${qr.name}`}
-            width={88}
-            height={88}
-            className="h-[88px] w-[88px]"
+          <QrCode
+            data={getRedirectUrl(qr.code)}
+            style={parseQrStyle(qr.style)}
+            size={88}
+            label={`QR code for ${qr.name}`}
+            className="pointer-events-none"
           />
         </Link>
 

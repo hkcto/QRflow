@@ -4,8 +4,11 @@ import { notFound } from "next/navigation";
 import { deleteQr } from "@/app/dashboard/actions";
 import { CopyButton } from "@/components/copy-button";
 import { DeleteForm } from "@/components/delete-form";
+import { QrCode } from "@/components/qr-code";
+import { QrDownloadButtons } from "@/components/qr-download-buttons";
 import { requireUser } from "@/lib/auth";
 import { getRedirectUrl } from "@/lib/qr";
+import { parseQrStyle } from "@/lib/qr-style";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -31,6 +34,7 @@ export default async function QrDetailPage({
   if (!qr) notFound();
 
   const shortUrl = getRedirectUrl(qr.code);
+  const style = parseQrStyle(qr.style);
   const createdAt = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(new Date(qr.created_at));
@@ -72,22 +76,23 @@ export default async function QrDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/qr/${qr.code}`}
-            alt={`QR code for ${qr.name}`}
-            width={320}
-            height={320}
-            className="mx-auto h-auto w-full max-w-[320px] rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:ring-slate-700"
+          <div className="mx-auto w-full max-w-[320px] rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:ring-slate-700">
+            <QrCode
+              data={shortUrl}
+              style={style}
+              size={288}
+              label={`QR code for ${qr.name}`}
+              className="mx-auto"
+            />
+          </div>
+          <QrDownloadButtons
+            data={shortUrl}
+            style={style}
+            name={qr.name || qr.code}
+            className="mt-4"
           />
-          <a
-            href={`/api/qr/${qr.code}?download=1`}
-            className="mt-4 flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500"
-          >
-            Download PNG
-          </a>
           <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
-            High resolution, 512 × 512 px, ready to print.
+            PNG at 512 px or 1024 px, or a scalable SVG. Ready to print.
           </p>
         </section>
 

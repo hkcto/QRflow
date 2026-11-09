@@ -1,5 +1,3 @@
-import QRCode from "qrcode";
-
 const CODE_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
 export const CODE_LENGTH = 7;
@@ -36,13 +34,4 @@ export function getAppUrl(): string {
 /** The value encoded inside the QR image. Never depends on target_url. */
 export function getRedirectUrl(code: string): string {
   return `${getAppUrl()}/r/${code}`;
-}
-
-export async function generateQrPng(code: string): Promise<Buffer> {
-  return QRCode.toBuffer(getRedirectUrl(code), {
-    type: "png",
-    width: 512,
-    margin: 2,
-    errorCorrectionLevel: "M",
-  });
 }

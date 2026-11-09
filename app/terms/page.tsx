@@ -75,10 +75,16 @@ export default function TermsPage() {
 
       <LegalSection heading="5. Printed codes and changing destinations">
         <p>
-          A QR image encodes a short link on our domain. If you change the
+          A dynamic QR image encodes a short link on our domain. If you change the
           destination, printed codes keep working. If you delete a code, pause it,
           change the app domain, or stop using the service, previously printed
           codes may stop working. Test before you print at scale.
+        </p>
+        <p>
+          Static QR codes generated on this site encode their content directly and
+          cannot be edited after download. You are responsible for that content,
+          and we cannot remotely disable or change a static code once it has been
+          printed or shared.
         </p>
       </LegalSection>
 

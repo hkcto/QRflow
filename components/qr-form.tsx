@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { QrStyleEditor } from "@/components/qr-style-editor";
+import { DEFAULT_QR_STYLE, type QrStyle } from "@/lib/qr-style";
 import type { FormState } from "@/lib/types";
 
 const inputClass =
@@ -12,6 +14,7 @@ export function QrForm({
   submitLabel,
   initialName = "",
   initialTargetUrl = "",
+  initialStyle,
   qrId,
   cancelHref,
 }: {
@@ -19,14 +22,17 @@ export function QrForm({
   submitLabel: string;
   initialName?: string;
   initialTargetUrl?: string;
+  initialStyle?: QrStyle;
   qrId?: string;
   cancelHref: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+  const [style, setStyle] = useState<QrStyle>(initialStyle ?? DEFAULT_QR_STYLE);
 
   return (
     <form action={formAction} className="space-y-5">
       {qrId ? <input type="hidden" name="id" value={qrId} /> : null}
+      <input type="hidden" name="style" value={JSON.stringify(style)} />
 
       <div>
         <label
@@ -88,6 +94,10 @@ export function QrForm({
             You can change this anytime. The printed QR code never changes.
           </p>
         )}
+      </div>
+
+      <div>
+        <QrStyleEditor value={style} onChange={setStyle} />
       </div>
 
       {state.error ? (

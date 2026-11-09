@@ -10,10 +10,11 @@ export const metadata: Metadata = {
 
 const freeFeatures = [
   "Unlimited dynamic QR codes",
-  "PNG download (512 px)",
+  "Styled QR codes (PNG + SVG)",
   "Live scan counts",
   "Edit destinations anytime",
   "Google sign-in",
+  "Free static QR generator (no account)",
 ];
 
 const proFeatures = [
@@ -37,6 +38,12 @@ export default async function PricingPage() {
           </Link>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            <Link
+              href="/static-qr"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 sm:block dark:text-slate-300 dark:hover:text-white"
+            >
+              Static QR
+            </Link>
             <Link
               href={user ? "/dashboard" : "/"}
               className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
@@ -131,9 +138,9 @@ export default async function PricingPage() {
         </div>
 
         <p className="mx-auto mt-8 max-w-2xl text-center text-xs text-slate-500 dark:text-slate-400">
-          Billing is intentionally not implemented in this MVP. Pro is controlled
-          by the server-only <code className="font-mono">ENABLE_PRO</code> environment
-          flag, ready for a Stripe integration later.
+          Billing is intentionally not implemented in this version. Pro is
+          controlled by the server-only <code className="font-mono">ENABLE_PRO</code>{" "}
+          environment flag, ready for a Stripe integration later.
         </p>
       </main>
 
@@ -143,6 +150,9 @@ export default async function PricingPage() {
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:text-slate-900 dark:hover:text-white">
               Home
+            </Link>
+            <Link href="/static-qr" className="hover:text-slate-900 dark:hover:text-white">
+              Static QR
             </Link>
             <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
               Privacy

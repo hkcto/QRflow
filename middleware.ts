@@ -6,6 +6,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Skip static assets, the public redirect endpoint and the QR image endpoint.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|r/|api/qr).*)"],
+  // Skip static assets and the public redirect endpoint.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|r/).*)"],
 };
