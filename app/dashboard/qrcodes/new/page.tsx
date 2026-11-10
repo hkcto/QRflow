@@ -21,9 +21,8 @@ export default function NewQrPage() {
         Create a QR code
       </h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        We will generate a short link and a QR image that always points to it.
-        You can change the destination later without reprinting, and pick a
-        style below.
+        Choose a link, text, Wi-Fi or vCard code. Link codes get a short link you
+        can change later without reprinting. Then style it however you like.
       </p>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">

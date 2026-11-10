@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
+import {
+  parseQrContentField,
+  parseQrKind,
+  validateQrContent,
+  type QrKind,
+} from "@/lib/qr-content";
 import { createClient } from "@/lib/supabase/server";
 import { generateCode } from "@/lib/qr";
 import { parseQrStyleField } from "@/lib/qr-style";
@@ -12,6 +18,9 @@ import type { Database, Json } from "@/types/database";
 
 type QrInsert = Database["public"]["Tables"]["qrcodes"]["Insert"];
 type QrUpdate = Database["public"]["Tables"]["qrcodes"]["Update"];
+
+const CONTENT_SCHEMA_ERROR =
+  "Text, Wi-Fi and vCard codes need the latest database schema. Run supabase/schema.sql, then try again.";
 
 function logAndMessage(context: string, error: { code?: string; message: string }) {
   console.error(`[${context}]`, error.code ?? "unknown", error.message);
@@ -30,6 +39,14 @@ function isMissingStyleColumn(error: { code?: string; message: string }) {
   );
 }
 
+/** `kind` and `payload` were added after the first release. */
+function isMissingContentColumn(error: { code?: string; message: string }) {
+  return (
+    (error.code === "42703" && /kind|payload/i.test(error.message)) ||
+    (error.code === "PGRST204" && /kind|payload/i.test(error.message))
+  );
+}
+
 export async function createQr(
   _state: FormState,
   formData: FormData
@@ -37,16 +54,25 @@ export async function createQr(
   const user = await getUser();
   if (!user) redirect("/");
 
+  const content = parseQrContentField(formData.get("content"));
+  const kind = content.kind;
   const { name, targetUrl, errors } = validateQrInput(
     formData.get("name"),
-    formData.get("target_url")
+    formData.get("target_url"),
+    { requireUrl: kind === "url" }
   );
+
+  const validatedContent = validateQrContent(kind, content);
+  if (validatedContent.error) errors.content = validatedContent.error;
   if (hasErrors(errors)) return { errors };
 
   const style = parseQrStyleField(formData.get("style"));
+  const target = kind === "url" ? targetUrl : "";
+  const contentPayload = validatedContent.payload as unknown as Json;
   const supabase = await createClient();
 
   let includeStyle = true;
+  let includeContent = true;
   let attempt = 0;
 
   while (attempt < 5) {
@@ -54,12 +80,14 @@ export async function createQr(
       user_id: user.id,
       name,
       code: generateCode(),
-      target_url: targetUrl,
+      target_url: target,
     };
 
-    const payload: QrInsert = includeStyle
-      ? { ...base, style: style as unknown as Json }
-      : base;
+    const payload: QrInsert = {
+      ...base,
+      ...(includeStyle ? { style: style as unknown as Json } : {}),
+      ...(includeContent ? { kind, payload: contentPayload } : {}),
+    };
 
     const { data, error } = await supabase
       .from("qrcodes")
@@ -75,6 +103,13 @@ export async function createQr(
     if (includeStyle && isMissingStyleColumn(error)) {
       console.warn("[createQr] style column missing; retrying without it");
       includeStyle = false;
+      continue;
+    }
+
+    if (includeContent && isMissingContentColumn(error)) {
+      if (kind !== "url") return { error: CONTENT_SCHEMA_ERROR };
+      console.warn("[createQr] kind/payload columns missing; retrying without them");
+      includeContent = false;
       continue;
     }
 
@@ -101,26 +136,70 @@ export async function updateQr(
     return { error: "Missing QR code id." };
   }
 
+  const requestedContent = parseQrContentField(formData.get("content"));
+  const supabase = await createClient();
+
+  // Read the stored type first: it is locked, so an edit can never turn a
+  // printed text code into a different type.
+  const existing = await supabase
+    .from("qrcodes")
+    .select("kind,payload,target_url")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  let contentColumns = true;
+  let existingKind: QrKind = "url";
+
+  if (existing.error) {
+    if (!isMissingContentColumn(existing.error)) {
+      return { error: logAndMessage("updateQr", existing.error) };
+    }
+    // Pre-migration rows can only be URL codes.
+    contentColumns = false;
+  } else if (!existing.data) {
+    return { error: "QR code not found." };
+  } else {
+    existingKind = parseQrKind(
+      (existing.data as { kind?: unknown }).kind
+    );
+  }
+
+  if (!contentColumns && requestedContent.kind !== "url") {
+    return { error: CONTENT_SCHEMA_ERROR };
+  }
+
+  const kind = contentColumns ? existingKind : "url";
+
+  if (contentColumns && requestedContent.kind !== existingKind) {
+    return { error: "The QR type cannot be changed after creation." };
+  }
+
   const { name, targetUrl, errors } = validateQrInput(
     formData.get("name"),
-    formData.get("target_url")
+    formData.get("target_url"),
+    { requireUrl: kind === "url" }
   );
+
+  const validatedContent = validateQrContent(kind, requestedContent);
+  if (validatedContent.error) errors.content = validatedContent.error;
   if (hasErrors(errors)) return { errors };
 
   const style = parseQrStyleField(formData.get("style"));
-  const supabase = await createClient();
+  const target = kind === "url" ? targetUrl : "";
+  const contentPayload = validatedContent.payload as unknown as Json;
 
   let includeStyle = true;
+  let includeContent = contentColumns;
   let data: { id: string }[] | null = null;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const payload: QrUpdate = includeStyle
-      ? {
-          name,
-          target_url: targetUrl,
-          style: style as unknown as Json,
-        }
-      : { name, target_url: targetUrl };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const payload: QrUpdate = {
+      name,
+      target_url: target,
+      ...(includeStyle ? { style: style as unknown as Json } : {}),
+      ...(includeContent ? { kind, payload: contentPayload } : {}),
+    };
 
     const result = await supabase
       .from("qrcodes")
@@ -137,6 +216,13 @@ export async function updateQr(
     if (includeStyle && isMissingStyleColumn(result.error)) {
       console.warn("[updateQr] style column missing; retrying without it");
       includeStyle = false;
+      continue;
+    }
+
+    if (includeContent && isMissingContentColumn(result.error)) {
+      if (kind !== "url") return { error: CONTENT_SCHEMA_ERROR };
+      console.warn("[updateQr] kind/payload columns missing; retrying without them");
+      includeContent = false;
       continue;
     }
 

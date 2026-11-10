@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { QrContentEditor } from "@/components/qr-content-editor";
 import { QrStyleEditor } from "@/components/qr-style-editor";
+import { emptyQrContent, type QrContentState } from "@/lib/qr-content";
 import { DEFAULT_QR_STYLE, type QrStyle } from "@/lib/qr-style";
 import type { FormState } from "@/lib/types";
 
@@ -13,26 +15,33 @@ export function QrForm({
   action,
   submitLabel,
   initialName = "",
-  initialTargetUrl = "",
   initialStyle,
+  initialContent,
+  kindLocked = false,
   qrId,
   cancelHref,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   submitLabel: string;
   initialName?: string;
-  initialTargetUrl?: string;
   initialStyle?: QrStyle;
+  initialContent?: QrContentState;
+  /** Existing codes keep their type so already-printed QRs stay valid. */
+  kindLocked?: boolean;
   qrId?: string;
   cancelHref: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [style, setStyle] = useState<QrStyle>(initialStyle ?? DEFAULT_QR_STYLE);
+  const [content, setContent] = useState<QrContentState>(
+    initialContent ?? emptyQrContent
+  );
 
   return (
     <form action={formAction} className="space-y-5">
       {qrId ? <input type="hidden" name="id" value={qrId} /> : null}
       <input type="hidden" name="style" value={JSON.stringify(style)} />
+      <input type="hidden" name="content" value={JSON.stringify(content)} />
 
       <div>
         <label
@@ -53,47 +62,24 @@ export function QrForm({
           className={inputClass}
         />
         {state.errors?.name ? (
-          <p id="name-error" className="mt-1.5 text-sm text-red-600 dark:text-red-400">
+          <p
+            id="name-error"
+            className="mt-1.5 text-sm text-red-600 dark:text-red-400"
+          >
             {state.errors.name}
           </p>
         ) : null}
       </div>
 
       <div>
-        <label
-          htmlFor="target_url"
-          className="block text-sm font-medium text-slate-700 dark:text-slate-200"
-        >
-          Destination URL
-        </label>
-        <input
-          id="target_url"
-          name="target_url"
-          type="url"
-          defaultValue={initialTargetUrl}
-          required
-          placeholder="https://example.com/menu"
-          aria-invalid={Boolean(state.errors?.targetUrl)}
-          aria-describedby={
-            state.errors?.targetUrl ? "target-url-error" : "target-url-hint"
-          }
-          className={inputClass}
+        <QrContentEditor
+          value={content}
+          onChange={setContent}
+          kindLocked={kindLocked}
+          urlFieldName="target_url"
+          urlError={state.errors?.targetUrl}
+          contentError={state.errors?.content}
         />
-        {state.errors?.targetUrl ? (
-          <p
-            id="target-url-error"
-            className="mt-1.5 text-sm text-red-600 dark:text-red-400"
-          >
-            {state.errors.targetUrl}
-          </p>
-        ) : (
-          <p
-            id="target-url-hint"
-            className="mt-1.5 text-xs text-slate-500 dark:text-slate-400"
-          >
-            You can change this anytime. The printed QR code never changes.
-          </p>
-        )}
       </div>
 
       <div>

@@ -30,7 +30,8 @@ export default async function DashboardPage() {
             Your QR codes
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Update a destination anytime. The printed image stays the same.
+            Links stay editable forever. Text, Wi-Fi and vCard codes are encoded
+            directly.
           </p>
         </div>
         <Link

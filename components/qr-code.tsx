@@ -61,18 +61,22 @@ export function QrCode({
     const container = containerRef.current;
     if (!container) return;
 
-    // Coalesce bursts (slider drags, rapid typing) into a single render per
-    // frame and build a fresh instance each time. Mutating an existing
-    // instance with `.update()` raced with its in-flight draw and could throw
-    // inside `isDark` when several style changes landed in the same tick.
-    const frame = requestAnimationFrame(() => {
+    // Coalesce bursts (slider drags, rapid typing) into a single render and
+    // build a fresh instance each time. Mutating an existing instance with
+    // `.update()` raced with its in-flight draw and could throw inside
+    // `isDark` when several style changes landed in the same tick.
+    //
+    // A timer is used instead of `requestAnimationFrame` because rAF is
+    // paused while a tab is hidden or throttled, which would leave the QR
+    // area permanently blank after opening the page in the background.
+    const timer = window.setTimeout(() => {
       const instance = new renderer(options);
       instanceRef.current = instance;
       container.replaceChildren();
       instance.append(container);
-    });
+    }, 0);
 
-    return () => cancelAnimationFrame(frame);
+    return () => window.clearTimeout(timer);
   }, [renderer, options]);
 
   useEffect(() => {

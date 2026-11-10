@@ -1,6 +1,7 @@
 export type FieldErrors = {
   name?: string;
   targetUrl?: string;
+  content?: string;
 };
 
 export type ValidatedQrInput = {
@@ -11,7 +12,8 @@ export type ValidatedQrInput = {
 
 export function validateQrInput(
   name: unknown,
-  targetUrl: unknown
+  targetUrl: unknown,
+  options: { requireUrl?: boolean } = {}
 ): ValidatedQrInput {
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanUrl = typeof targetUrl === "string" ? targetUrl.trim() : "";
@@ -23,16 +25,20 @@ export function validateQrInput(
     errors.name = "Name must be 100 characters or fewer.";
   }
 
-  if (!cleanUrl) {
-    errors.targetUrl = "Destination URL is required.";
-  } else {
-    try {
-      const parsed = new URL(cleanUrl);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        errors.targetUrl = "Only http:// and https:// links are allowed.";
+  // Text/Wi-Fi/vCard codes encode their content directly and never use the
+  // redirect route, so they do not need a destination URL.
+  if (options.requireUrl !== false) {
+    if (!cleanUrl) {
+      errors.targetUrl = "Destination URL is required.";
+    } else {
+      try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          errors.targetUrl = "Only http:// and https:// links are allowed.";
+        }
+      } catch {
+        errors.targetUrl = "Enter a valid URL starting with https://";
       }
-    } catch {
-      errors.targetUrl = "Enter a valid URL starting with https://";
     }
   }
 

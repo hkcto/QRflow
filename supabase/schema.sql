@@ -19,6 +19,24 @@ create table if not exists public.qrcodes (
 alter table public.qrcodes
   add column if not exists style jsonb not null default '{}'::jsonb;
 
+-- Content type. URL codes use `target_url` + `/r/<code>` (editable, tracked).
+-- Text/Wi-Fi/vCard codes store their content in `payload` and encode it
+-- directly, so `target_url` is an empty string and `/r/<code>` is unused.
+alter table public.qrcodes
+  add column if not exists kind text not null default 'url';
+alter table public.qrcodes
+  add column if not exists payload jsonb not null default '{}'::jsonb;
+
+do $$
+begin
+  alter table public.qrcodes
+    add constraint qrcodes_kind_check
+    check (kind in ('url', 'text', 'wifi', 'vcard'));
+exception
+  when duplicate_object then null;
+end
+$$;
+
 create index if not exists qrcodes_user_created_idx
   on public.qrcodes (user_id, created_at desc);
 

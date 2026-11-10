@@ -4,6 +4,11 @@ import { notFound } from "next/navigation";
 import { updateQr } from "@/app/dashboard/actions";
 import { QrForm } from "@/components/qr-form";
 import { requireUser } from "@/lib/auth";
+import {
+  parseQrKind,
+  qrContentFromRow,
+  QR_KIND_LABELS,
+} from "@/lib/qr-content";
 import { parseQrStyle } from "@/lib/qr-style";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,6 +34,9 @@ export default async function EditQrPage({
 
   if (!qr) notFound();
 
+  const kind = parseQrKind(qr.kind);
+  const isUrl = kind === "url";
+
   return (
     <div className="mx-auto max-w-2xl">
       <Link
@@ -42,11 +50,20 @@ export default async function EditQrPage({
         Edit QR code
       </h1>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        The short link{" "}
-        <span className="font-mono text-slate-800 dark:text-slate-200">
-          /r/{qr.code}
-        </span>{" "}
-        stays exactly the same. Only the destination and appearance change.
+        {isUrl ? (
+          <>
+            The short link{" "}
+            <span className="font-mono text-slate-800 dark:text-slate-200">
+              /r/{qr.code}
+            </span>{" "}
+            stays exactly the same. Only the destination and appearance change.
+          </>
+        ) : (
+          <>
+            This {QR_KIND_LABELS[kind]} code encodes its content directly. The
+            type is locked, and changing the content means printing a new code.
+          </>
+        )}
       </p>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 dark:border-slate-800 dark:bg-slate-900">
@@ -54,8 +71,9 @@ export default async function EditQrPage({
           action={updateQr}
           submitLabel="Save changes"
           initialName={qr.name}
-          initialTargetUrl={qr.target_url}
+          initialContent={qrContentFromRow(qr)}
           initialStyle={parseQrStyle(qr.style)}
+          kindLocked
           qrId={qr.id}
           cancelHref={`/dashboard/qrcodes/${qr.id}`}
         />

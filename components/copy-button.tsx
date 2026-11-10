@@ -4,9 +4,11 @@ import { useState } from "react";
 
 export function CopyButton({
   value,
+  label = "Copy link",
   className = "",
 }: {
   value: string;
+  label?: string;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -30,7 +32,7 @@ export function CopyButton({
         "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
       }
     >
-      {copied ? "Copied!" : "Copy link"}
+      {copied ? "Copied!" : label}
     </button>
   );
 }

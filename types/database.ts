@@ -19,6 +19,8 @@ export type Database = {
           scan_count: number;
           is_active: boolean;
           style: Json;
+          kind: string;
+          payload: Json;
           created_at: string;
         };
         Insert: {
@@ -30,6 +32,8 @@ export type Database = {
           scan_count?: number;
           is_active?: boolean;
           style?: Json;
+          kind?: string;
+          payload?: Json;
           created_at?: string;
         };
         Update: {
@@ -41,6 +45,8 @@ export type Database = {
           scan_count?: number;
           is_active?: boolean;
           style?: Json;
+          kind?: string;
+          payload?: Json;
           created_at?: string;
         };
         Relationships: [];

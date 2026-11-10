@@ -15,12 +15,13 @@
 |---|---|
 | Google 登入 / 登出 | ✅ |
 | 受保護的 `/dashboard` | ✅ |
-| 建立 QR（名稱 + 目標網址 + 隨機 7 位短碼） | ✅ |
-| 列表：名稱、目標網址、掃描數 | ✅ |
-| 編輯名稱 / 目標網址（短碼不變） | ✅ |
+| 建立 QR（Link / Text / Wi-Fi / vCard） | ✅ |
+| 列表：名稱、內容摘要、掃描數 | ✅ |
+| 編輯名稱 / 目標網址（Link 短碼不變；其他類型鎖定型別） | ✅ |
 | 刪除（含二次確認） | ✅ |
 | QR 樣式：6 組預設 + 完整外觀（點狀 / 邊角 / 漸層 / 背景圓角 / 圓形） | ✅ |
-| QR 檢視、複製短鏈、PNG 512 / PNG 1024 / SVG 下載 | ✅ |
+| QR Logo：PNG / JPEG / WebP 上傳、大小 / 留白 / 清除底點，自動提升容錯至 H | ✅ |
+| QR 檢視、複製短鏈或內容、PNG 512 / PNG 1024 / SVG 下載 | ✅ |
 | 免登入靜態 QR（Link / Text / Wi-Fi / vCard） | ✅ |
 | 匿名掃描計數（原子遞增） | ✅ |
 | 深色模式、響應式 | ✅ |
@@ -44,11 +45,13 @@ QRCode_saas/
 │  ├─ qr.ts                 # 短碼、短鏈
 │  ├─ qr-style.ts           # 樣式型別、預設集、白名單驗證
 │  ├─ qr-payload.ts         # 靜態 QR 內容（Link / Text / Wi-Fi / vCard）
+│  ├─ qr-content.ts         # 四種 QR 類型、payload 正規化與伺服器驗證
 │  ├─ validation.ts         # 表單驗證（無 zod）
 │  ├─ types.ts
 │  └─ supabase/             # client / server / middleware
 ├─ components/
-│  ├─ qr-form.tsx           # useActionState 表單（含樣式面板）
+│  ├─ qr-form.tsx           # useActionState 表單（內容 + 樣式面板）
+│  ├─ qr-content-editor.tsx # 共用內容編輯器（Link / Text / Wi-Fi / vCard）
 │  ├─ qr-code.tsx           # 客戶端 qr-code-styling 渲染器
 │  ├─ qr-style-editor.tsx   # 樣式面板
 │  ├─ qr-download-buttons.tsx
@@ -102,7 +105,7 @@ npm run lint
 
 1. 建立專案：<https://supabase.com/dashboard> → **New project**（區域選離使用者最近的）。
 2. 開啟 **SQL Editor → New query**，貼上 `supabase/schema.sql` 全文並執行。
-   - 這會建立 `qrcodes` 表、索引、`style` 欄位、4 條 RLS 策略，以及兩個 `SECURITY DEFINER` 函式：
+   - 這會建立 `qrcodes` 表、索引、`style` / `kind` / `payload` 欄位、4 條 RLS 策略，以及兩個 `SECURITY DEFINER` 函式：
      - `increment_scan(code)`：匿名掃描時原子遞增並回傳目標網址
      - `get_qr_public(code)`：保留給舊版 PNG 端點，現已不再使用（不刪除，避免破壞性變更）
 
@@ -111,9 +114,13 @@ npm run lint
    > ```sql
    > alter table public.qrcodes
    >   add column if not exists style jsonb not null default '{}'::jsonb;
+   > alter table public.qrcodes
+   >   add column if not exists kind text not null default 'url';
+   > alter table public.qrcodes
+   >   add column if not exists payload jsonb not null default '{}'::jsonb;
    > ```
    >
-   > 未執行遷移前，程式仍可運作（會自動退回不寫入樣式），但重新整理後樣式不會保留。
+   > 未執行遷移前，Link QR 仍可正常建立與編輯（程式會自動退回不寫入樣式 / 類型），但樣式不會保留，Text / Wi-Fi / vCard 會提示先執行 `supabase/schema.sql`。
 3. 取得金鑰：**Project Settings → API**
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -196,10 +203,15 @@ update public.qrcodes set is_active = false where code = 'abc1234';
 - [ ] Google 登入成功、登出可用
 - [ ] 未登入訪問 `/dashboard` 會回首頁
 - [ ] 建立 QR 後出現在列表，縮圖與所選樣式一致
+- [ ] 登入後可建立 Link / Text / Wi-Fi / vCard 四種類型
+- [ ] Text / Wi-Fi / vCard 內容直接編碼，無 `/r/` 短鏈、無掃描計數
+- [ ] 編輯已建立的 QR 時類型鎖定，內容與樣式仍可修改
 - [ ] 建立時選樣式 → 重新整理後樣式保留
-- [ ] 登入與未登入使用同一套樣式面板（漸層、圓角、圓形代碼功能一致）
+- [ ] 上傳 Logo 後即時預覽、切換預設樣式仍保留 Logo，PNG / SVG 下載都含 Logo
+- [ ] 有 Logo 時容錯自動為 H；移除 Logo 後回到 Q
+- [ ] 登入與未登入使用同一套樣式面板（漸層、圓角、圓形代碼、Logo 功能一致）
 - [ ] 漸層樣式下載 PNG 512 / PNG 1024 / SVG 正常
-- [ ] 下載 PNG 512 / PNG 1024 / SVG，手機掃描可跳轉
+- [ ] 下載 PNG 512 / PNG 1024 / SVG，手機掃描可跳轉或讀出內容
 - [ ] 修改目標網址後，同一張圖跳到新網址，`/r/<code>` 不變
 - [ ] 每次掃描 `scan_count + 1`
 - [ ] `/static-qr` 未登入可開，四種內容類型都能產生 QR
@@ -244,7 +256,8 @@ delete from public.qrcodes where code = 'abc1234';
 
 - **計數沒有防刷**：任何請求（含機器人）都會 +1。可在 `/r/[code]` 過濾常見 bot UA，或加邊緣限流。
 - **公開跳轉端點**：可能被用來指向惡意網站。上線後請定期用上面的 SQL 巡查，必要時 `is_active = false` 或刪除。
-- **靜態 QR 無法遠端修改**：內容直接寫進圖檔，下載後就固定了；違規內容只能請使用者自行停用。
+- **靜態 QR 無法遠端修改**：`/static-qr` 的內容直接寫進圖檔，下載後就固定了；違規內容只能請使用者自行停用。
+- **直接編碼類型無掃描計數**：Text / Wi-Fi / vCard 不經過 `/r/<code>`，所以沒有掃描數；修改內容等於換一張新 QR，已印出的舊碼不變。
 - **QR 在瀏覽器產生**：因此無法用單一網址取得 PNG（例如 email 內嵌或 OG image）。儀表板與 `/static-qr` 皆為即時渲染。
 - **無分頁**：列表一次載入全部。使用者量大時再加 `.range()`。
 - **無掃描明細**：只有總數。要按天/裝置統計需另建 `scans` 表。
@@ -273,6 +286,8 @@ delete from public.qrcodes where code = 'abc1234';
 - 短碼：7 位 `[a-z0-9]`，建立時遇唯一鍵衝突（`23505`）自動重試 5 次。
 - 目標網址只允許 `http:` / `https:`，避免 `javascript:` 注入。
 - QR 內編碼的是 `/r/<code>`，與 `target_url` 完全解耦。
-- QR 由 `qr-code-styling` 在瀏覽器繪製（`components/qr-code.tsx` 動態 import），固定錯誤修正 `Q`、約 4 模組留白、不嵌 logo，以保護掃描率。
-- 樣式在 Server Action 以白名單驗證（固定 enum + `#rrggbb`，背景可用 `transparent`），不信任前端 JSON。
+- QR 由 `qr-code-styling` 在瀏覽器繪製（`components/qr-code.tsx` 動態 import），約 4 模組留白；一般固定錯誤修正 `Q`，有 Logo 時自動提升為 `H`。
+- Logo 以 data URL 儲存在 `style.logo`，只接受 `png` / `jpeg` / `webp`，長度上限 400k；使用者端先縮放與壓縮，伺服器再以白名單驗證（拒絕 SVG / 遠端 URL）。
+- QR 類型與內容存於 `kind` / `payload`；Link 使用 `target_url` + `/r/<code>`，其餘直接編碼。類型建立後鎖定，避免已印出的 QR 失效。
+- 樣式與內容都在 Server Action 以白名單驗證（固定 enum + `#rrggbb`，背景可用 `transparent`；內容重新建構 payload 並檢查大小），不信任前端 JSON。
 - `qr-code-styling` 型別會引用 `canvas` / `jsdom`，靠 `skipLibCheck` 與 `next.config.ts` 的 webpack alias 避開。

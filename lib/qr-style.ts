@@ -57,6 +57,20 @@ export type QrFill = {
   gradient?: QrGradient;
 };
 
+/**
+ * Optional centre image. Stored as a data URL so the QR stays self-contained
+ * and the renderer never fetches a third-party origin.
+ */
+export type QrLogo = {
+  dataUrl: string;
+  /** Share of the QR width, 0.1–0.5. */
+  size: number;
+  /** Quiet padding around the logo in rendered pixels, 0–24. */
+  margin: number;
+  /** Clear the modules behind the logo (recommended). */
+  hideBackgroundDots: boolean;
+};
+
 export type QrStyle = {
   dots: QrFill & {
     type: DotType;
@@ -76,6 +90,7 @@ export type QrStyle = {
     round: number;
   };
   shape: QrShape;
+  logo?: QrLogo;
 };
 
 export type QrStylePreset = {
@@ -87,10 +102,22 @@ export type QrStylePreset = {
 
 /** Fixed render parameters chosen to protect scan reliability. */
 export const QR_ERROR_CORRECTION = "Q" as const;
+/** A centre image hides modules, so it needs the strongest correction level. */
+export const QR_ERROR_CORRECTION_WITH_LOGO = "H" as const;
 /** Quiet zone as a share of the rendered width (~4 modules at typical sizes). */
 export const QR_MARGIN_RATIO = 0.12;
 /** qr-code-styling supports at most this many gradient colour stops. */
 export const MAX_GRADIENT_STOPS = 5;
+
+/** Logo data URL rules shared by the client upload flow and the server. */
+export const LOGO_DATA_URL_PATTERN =
+  /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+=*$/i;
+export const MAX_LOGO_DATA_URL_LENGTH = 400_000;
+export const LOGO_SIZE_MIN = 0.1;
+export const LOGO_SIZE_MAX = 0.5;
+export const LOGO_MARGIN_MAX = 24;
+export const DEFAULT_LOGO_SIZE = 0.4;
+export const DEFAULT_LOGO_MARGIN = 4;
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -254,6 +281,39 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Only self-contained raster data URLs are accepted. SVG is rejected because
+ * an inline SVG can carry script and the value is rendered straight into the
+ * canvas. Oversized payloads are dropped rather than truncated (a truncated
+ * base64 image cannot be decoded).
+ */
+function normalizeLogo(value: unknown): QrLogo | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const dataUrl = typeof value.dataUrl === "string" ? value.dataUrl.trim() : "";
+  if (
+    !dataUrl ||
+    dataUrl.length > MAX_LOGO_DATA_URL_LENGTH ||
+    !LOGO_DATA_URL_PATTERN.test(dataUrl)
+  ) {
+    return undefined;
+  }
+
+  return {
+    dataUrl,
+    size: clampNumber(value.size, LOGO_SIZE_MIN, LOGO_SIZE_MAX, DEFAULT_LOGO_SIZE),
+    margin: Math.round(
+      clampNumber(value.margin, 0, LOGO_MARGIN_MAX, DEFAULT_LOGO_MARGIN)
+    ),
+    hideBackgroundDots: value.hideBackgroundDots !== false,
+  };
+}
+
 function normalizeGradient(value: unknown): QrGradient | undefined {
   if (!isRecord(value)) return undefined;
   if (!GRADIENT_TYPES.includes(value.type as GradientType)) return undefined;
@@ -343,6 +403,8 @@ export function normalizeQrStyle(input: unknown): QrStyle {
       ? clamp01(background.round)
       : 0;
 
+  const logo = normalizeLogo(value.logo);
+
   return {
     dots: {
       ...dotsFill,
@@ -364,6 +426,7 @@ export function normalizeQrStyle(input: unknown): QrStyle {
       ...(backgroundFill.gradient ? { color: validColor(backgroundFill.color, "#ffffff") } : {}),
     },
     shape: pickEnum(value.shape, QR_SHAPES, "square"),
+    ...(logo ? { logo } : {}),
   };
 }
 
@@ -417,6 +480,7 @@ export function qrStyleToOptions({
   type?: "canvas" | "svg";
 }): Options {
   const safe = normalizeQrStyle(style);
+  const logo = safe.logo;
 
   return {
     type,
@@ -425,7 +489,13 @@ export function qrStyleToOptions({
     height: size,
     margin: Math.round(size * QR_MARGIN_RATIO),
     data,
-    qrOptions: { errorCorrectionLevel: QR_ERROR_CORRECTION },
+    // A centre image covers modules, so bump Q → H whenever one is present.
+    qrOptions: {
+      errorCorrectionLevel: logo
+        ? QR_ERROR_CORRECTION_WITH_LOGO
+        : QR_ERROR_CORRECTION,
+    },
+    ...(logo ? { image: logo.dataUrl } : {}),
     dotsOptions: {
       ...fillToOptions(safe.dots),
       type: safe.dots.type,
@@ -446,6 +516,12 @@ export function qrStyleToOptions({
       ...fillToOptions(safe.background),
       round: safe.background.round,
     },
-    imageOptions: { hideBackgroundDots: true, imageSize: 0.4, margin: 0 },
+    imageOptions: logo
+      ? {
+          hideBackgroundDots: logo.hideBackgroundDots,
+          imageSize: logo.size,
+          margin: logo.margin,
+        }
+      : { hideBackgroundDots: true, imageSize: 0.4, margin: 0 },
   };
 }

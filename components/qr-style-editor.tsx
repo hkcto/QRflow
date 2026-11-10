@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import {
   CORNER_DOT_TYPES,
   CORNER_SQUARE_TYPES,
+  DEFAULT_LOGO_MARGIN,
+  DEFAULT_LOGO_SIZE,
   DEFAULT_QR_STYLE,
   DOT_TYPES,
   GRADIENT_TYPES,
+  LOGO_MARGIN_MAX,
+  LOGO_SIZE_MAX,
+  LOGO_SIZE_MIN,
   MAX_GRADIENT_STOPS,
+  MAX_LOGO_DATA_URL_LENGTH,
   QR_SHAPES,
   QR_STYLE_PRESETS,
   qrStyleKey,
@@ -25,8 +32,58 @@ const colorClass =
 const rangeClass =
   "mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-indigo-600 dark:bg-slate-700";
 
+/** Preset matching ignores the logo, so uploading one keeps a preset active. */
 function presetKey(style: QrStyle): string {
-  return qrStyleKey(style);
+  return qrStyleKey({ ...style, logo: undefined });
+}
+
+const LOGO_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const LOGO_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+const LOGO_MAX_EDGE = 512;
+
+/**
+ * Rasterizes the upload in the browser and re-encodes it until the data URL
+ * fits the server-side cap. This keeps `qrcodes.style` small and means the
+ * server only ever sees a compact, self-contained image.
+ */
+async function fileToLogoDataUrl(file: File): Promise<string> {
+  if (!LOGO_MIME_TYPES.includes(file.type)) {
+    throw new Error("Use a PNG, JPEG or WebP image.");
+  }
+  if (file.size > LOGO_MAX_SOURCE_BYTES) {
+    throw new Error("That image is larger than 8 MB. Use a smaller file.");
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const sizes = [1, 0.8, 0.6, 0.45, 0.35];
+
+  try {
+    for (const factor of sizes) {
+      const width = Math.max(1, Math.round(bitmap.width * scale * factor));
+      const height = Math.max(1, Math.round(bitmap.height * scale * factor));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) break;
+      context.drawImage(bitmap, 0, 0, width, height);
+
+      for (const quality of [0.92, 0.8, 0.65, 0.5]) {
+        const dataUrl = canvas.toDataURL("image/webp", quality);
+        if (
+          dataUrl.startsWith("data:image/webp") &&
+          dataUrl.length <= MAX_LOGO_DATA_URL_LENGTH
+        ) {
+          return dataUrl;
+        }
+      }
+    }
+  } finally {
+    bitmap.close();
+  }
+
+  throw new Error("Could not compress that image. Try a simpler logo.");
 }
 
 function cssGradient(gradient: QrGradient): string {
@@ -410,6 +467,8 @@ export function QrStyleEditor({
   onChange: React.Dispatch<React.SetStateAction<QrStyle>>;
 }) {
   const activePreset = presetKey(value);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
 
   function update<K extends keyof QrStyle>(
     key: K,
@@ -422,6 +481,51 @@ export function QrStyleEditor({
       // without a gradient and must replace the fill, not merge into it.
       if ("color" in patch && !("gradient" in patch)) delete next.gradient;
       return { ...previous, [key]: next } as QrStyle;
+    });
+  }
+
+  async function handleLogoFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset so choosing the same file again still fires a change event.
+    event.target.value = "";
+    if (!file) return;
+
+    setLogoError(null);
+    setLogoBusy(true);
+    try {
+      const dataUrl = await fileToLogoDataUrl(file);
+      onChange((previous) => ({
+        ...previous,
+        logo: {
+          dataUrl,
+          size: previous.logo?.size ?? DEFAULT_LOGO_SIZE,
+          margin: previous.logo?.margin ?? DEFAULT_LOGO_MARGIN,
+          hideBackgroundDots: previous.logo?.hideBackgroundDots ?? true,
+        },
+      }));
+    } catch (error) {
+      setLogoError(
+        error instanceof Error ? error.message : "Could not read that image."
+      );
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  function updateLogo(patch: Partial<NonNullable<QrStyle["logo"]>>) {
+    onChange((previous) =>
+      previous.logo
+        ? { ...previous, logo: { ...previous.logo, ...patch } }
+        : previous
+    );
+  }
+
+  function removeLogo() {
+    setLogoError(null);
+    onChange((previous) => {
+      const next = { ...previous };
+      delete next.logo;
+      return next;
     });
   }
 
@@ -442,7 +546,12 @@ export function QrStyleEditor({
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => onChange(structuredClone(preset.style))}
+                onClick={() =>
+                  onChange((previous) => ({
+                    ...structuredClone(preset.style),
+                    ...(previous.logo ? { logo: previous.logo } : {}),
+                  }))
+                }
                 aria-pressed={active}
                 title={preset.description}
                 className={
@@ -468,6 +577,121 @@ export function QrStyleEditor({
         </summary>
 
         <div className="space-y-3 border-t border-slate-200 px-4 py-4 dark:border-slate-800">
+          <Section
+            title="Logo"
+            description="Put an image in the centre. Error correction is raised to H automatically."
+          >
+            {value.logo ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={value.logo.dataUrl}
+                    alt="Logo preview"
+                    className="h-16 w-16 rounded-lg bg-white object-contain ring-1 ring-slate-200 dark:ring-slate-700"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Logo added
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Scaled and compressed on your device.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeLogo}
+                    className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="logo-size">
+                    Logo size · {Math.round(value.logo.size * 100)}%
+                  </label>
+                  <input
+                    id="logo-size"
+                    type="range"
+                    min={LOGO_SIZE_MIN}
+                    max={LOGO_SIZE_MAX}
+                    step={0.01}
+                    value={value.logo.size}
+                    onChange={(event) =>
+                      updateLogo({ size: Number(event.target.value) })
+                    }
+                    className={rangeClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="logo-margin">
+                    Logo padding · {value.logo.margin}px
+                  </label>
+                  <input
+                    id="logo-margin"
+                    type="range"
+                    min={0}
+                    max={LOGO_MARGIN_MAX}
+                    step={1}
+                    value={value.logo.margin}
+                    onChange={(event) =>
+                      updateLogo({ margin: Number(event.target.value) })
+                    }
+                    className={rangeClass}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={value.logo.hideBackgroundDots}
+                    onChange={(event) =>
+                      updateLogo({ hideBackgroundDots: event.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900"
+                  />
+                  Clear modules behind the logo
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogoError(null);
+                    document.getElementById("logo-upload")?.click();
+                  }}
+                  className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                >
+                  Replace logo
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                PNG, JPEG or WebP. Keep it simple and high-contrast.
+              </p>
+            )}
+
+            <input
+              id="logo-upload"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleLogoFile}
+              disabled={logoBusy}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-700 disabled:opacity-60 dark:text-slate-300 dark:file:bg-white dark:file:text-slate-900 dark:hover:file:bg-slate-200"
+            />
+            {logoBusy ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Processing logo…
+              </p>
+            ) : null}
+            {logoError ? (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {logoError}
+              </p>
+            ) : null}
+          </Section>
+
           <Section title="Modules" description="The dots that make up the code.">
             <div>
               <label className={labelClass} htmlFor="dots-type">
@@ -641,7 +865,12 @@ export function QrStyleEditor({
 
           <button
             type="button"
-            onClick={() => onChange(structuredClone(DEFAULT_QR_STYLE))}
+            onClick={() =>
+              onChange((previous) => ({
+                ...structuredClone(DEFAULT_QR_STYLE),
+                ...(previous.logo ? { logo: previous.logo } : {}),
+              }))
+            }
             className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
           >
             Reset to classic
