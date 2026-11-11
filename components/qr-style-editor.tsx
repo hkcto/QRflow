@@ -71,10 +71,12 @@ async function fileToLogoDataUrl(file: File): Promise<string> {
 
       for (const quality of [0.92, 0.8, 0.65, 0.5]) {
         const dataUrl = canvas.toDataURL("image/webp", quality);
-        if (
-          dataUrl.startsWith("data:image/webp") &&
-          dataUrl.length <= MAX_LOGO_DATA_URL_LENGTH
-        ) {
+        // Older Safari ignores the requested type and returns PNG. Both are
+        // accepted by the server whitelist, so take whichever came back.
+        const usable =
+          dataUrl.startsWith("data:image/webp") ||
+          dataUrl.startsWith("data:image/png");
+        if (usable && dataUrl.length <= MAX_LOGO_DATA_URL_LENGTH) {
           return dataUrl;
         }
       }

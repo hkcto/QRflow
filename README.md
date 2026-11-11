@@ -226,7 +226,7 @@ update public.qrcodes set is_active = false where code = 'abc1234';
 
 ## 6. 運營後台（Supabase Studio）
 
-MVP 不建 Admin UI，直接用 Supabase Studio：
+不建 Admin UI，直接用 Supabase Studio：
 
 ```sql
 -- 全站概況
@@ -252,7 +252,7 @@ delete from public.qrcodes where code = 'abc1234';
 
 ---
 
-## 7. 已知限制（MVP 刻意取捨）
+## 7. 已知限制（刻意取捨）
 
 - **計數沒有防刷**：任何請求（含機器人）都會 +1。可在 `/r/[code]` 過濾常見 bot UA，或加邊緣限流。
 - **公開跳轉端點**：可能被用來指向惡意網站。上線後請定期用上面的 SQL 巡查，必要時 `is_active = false` 或刪除。

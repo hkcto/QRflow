@@ -1,4 +1,4 @@
--- QRflow — dynamic QR code MVP schema
+-- QRflow — dynamic QR code schema
 -- Run this once in Supabase → SQL Editor → New query → Run.
 -- Safe to re-run: every statement is idempotent.
 
