@@ -196,6 +196,8 @@ update public.qrcodes set is_active = false where code = 'abc1234';
 
 > `NEXT_PUBLIC_APP_URL` 決定 QR 圖片裡編碼的網址。**一旦印出就不要改網域**，否則舊碼會指向舊網域。
 
+> **效能**：`vercel.json` 把 Serverless Function 固定在 `hkg1`（香港），貼近主要使用者，也比預設 `iad1` 更接近 Supabase 的亞洲資料庫。`/`、`/pricing`、`/static-qr` 與法務頁都是靜態預渲染，直接由 CDN 提供；中間件只跑 `/`、`/dashboard/*`、`/auth/*`，公開頁面不會觸發 Supabase 驗證。
+
 ---
 
 ## 5. 驗收清單
