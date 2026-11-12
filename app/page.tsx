@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { signInWithGoogle } from "@/app/actions";
+import { AuthErrorNotice } from "@/components/auth-error-notice";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { getUser } from "@/lib/auth";
 
 function GoogleMark() {
   return (
@@ -40,16 +39,7 @@ function Logo() {
   );
 }
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const user = await getUser();
-  if (user) redirect("/dashboard");
-
-  const { error } = await searchParams;
-
+export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-slate-50/80 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/80">
@@ -84,16 +74,7 @@ export default async function HomePage({
       </header>
 
       <main className="flex-1">
-        {error === "auth" ? (
-          <div className="mx-auto mt-6 w-full max-w-6xl px-4 sm:px-6">
-            <p
-              role="alert"
-              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
-            >
-              Sign in failed. Please try again.
-            </p>
-          </div>
-        ) : null}
+        <AuthErrorNotice />
 
         <section className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div>

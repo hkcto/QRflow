@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { getUser } from "@/lib/auth";
 import { features } from "@/lib/features";
 
 export const metadata: Metadata = {
@@ -25,8 +24,7 @@ const proFeatures = [
   "CSV export",
 ];
 
-export default async function PricingPage() {
-  const user = await getUser();
+export default function PricingPage() {
   const proEnabled = features.pro;
 
   return (
@@ -45,10 +43,10 @@ export default async function PricingPage() {
               Static QR
             </Link>
             <Link
-              href={user ? "/dashboard" : "/"}
+              href="/"
               className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
             >
-              {user ? "Dashboard" : "Sign in"}
+              Sign in
             </Link>
           </div>
         </div>
@@ -88,10 +86,10 @@ export default async function PricingPage() {
               ))}
             </ul>
             <Link
-              href={user ? "/dashboard" : "/"}
+              href="/"
               className="mt-7 block rounded-lg bg-slate-900 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
             >
-              {user ? "Go to dashboard" : "Get started"}
+              Get started
             </Link>
           </section>
 

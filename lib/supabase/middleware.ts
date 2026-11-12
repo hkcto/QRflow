@@ -5,6 +5,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * Refreshes the Supabase auth session on every matched request so that
  * server components always read fresh cookies. The actual route guard lives
  * in `app/dashboard/layout.tsx`.
+ *
+ * Returns the validated user so callers (e.g. the homepage redirect) do not
+ * need a second auth round trip.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -30,7 +33,9 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return response;
+  return { response, user };
 }
